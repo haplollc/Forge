@@ -93,40 +93,50 @@ public struct ForgeOverlay: View {
     // MARK: - Expanded content
 
     private var expandedContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             header
 
-            modelHeader
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 12) {
+                    modelHeader
 
-            VStack(spacing: 8) {
-                ForgeChart(
-                    title: "Tokens / sec",
-                    unit: "t/s",
-                    valueLabel: formattedTPSValue,
-                    samples: store.tpsHistory,
-                    isActive: store.snapshot.isGenerating
-                )
-
-                ForgeChart(
-                    title: "Memory",
-                    unit: memoryUnit,
-                    valueLabel: memoryValueLabel,
-                    samples: store.memoryHistory,
-                    isActive: false
-                )
-
-                if let progress = contextProgress {
-                    ForgeFillBar(
-                        title: "Context",
-                        valueLabel: contextString,
-                        progress: progress
+                    ForgeChart(
+                        title: "Tokens / sec",
+                        unit: "t/s",
+                        valueLabel: formattedTPSValue,
+                        samples: store.tpsHistory,
+                        capacity: ForgeStore.historyCapacity,
+                        style: .tokensPerSecond(observedPeak: store.observedPeakTPS),
+                        isActive: store.snapshot.isGenerating
                     )
+
+                    ForgeChart(
+                        title: "Memory",
+                        unit: memoryUnit,
+                        valueLabel: memoryValueLabel,
+                        samples: store.memoryHistory,
+                        capacity: ForgeStore.historyCapacity,
+                        style: .memory(budgetMB: store.memoryBudgetMB),
+                        isActive: false
+                    )
+
+                    if let progress = contextProgress {
+                        ForgeFillBar(
+                            title: "Context",
+                            valueLabel: contextString,
+                            progress: progress,
+                            style: .contextUsage
+                        )
+                    }
+
+                    metricGrid
+
+                    samplerRow
                 }
+                .padding(.bottom, 4)
             }
-
-            metricGrid
-
-            samplerRow
+            .frame(maxHeight: 360)
+            .scrollBounceBehavior(.basedOnSize)
         }
     }
 
