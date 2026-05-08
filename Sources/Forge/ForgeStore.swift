@@ -60,6 +60,10 @@ final class ForgeStore: ObservableObject {
 
     private func poll() {
         guard let provider else { return }
+        // Let TPS decay naturally to zero if no ticks have arrived in the
+        // rolling window — otherwise the bar would freeze on the last
+        // value when the model finishes generating.
+        Forge.shared.decayIfStale()
         var snap = provider.forgeSnapshot
 
         if snap.tokensPerSecond == nil, Forge.shared.autoTokensPerSecond > 0 {
