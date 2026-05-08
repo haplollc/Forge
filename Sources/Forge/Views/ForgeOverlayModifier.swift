@@ -1,67 +1,67 @@
 import SwiftUI
 
-/// View modifier that pins a `ForgeOverlay` to the top of the modified view.
-/// Apply on the content area of your screen — the modifier inserts the
-/// overlay using SwiftUI's `.overlay(alignment: .top)` so it floats *above*
-/// your content without affecting layout.
+/// A drop-in `ForgeBar` view designed to be placed directly above a chat
+/// input bar (or anywhere else you'd like a debugger HUD to live). The
+/// collapsed state matches the dimensions of an empty single-row input
+/// bar; tap it and the panel grows in place with animated graphs.
+public struct ForgeBar: View {
+    private weak var provider: ForgeProvider?
+    private let isEnabled: Bool
+    private let refreshHz: Double
+
+    public init(provider: ForgeProvider?, isEnabled: Bool = true, refreshHz: Double = 4) {
+        self.provider = provider
+        self.isEnabled = isEnabled
+        self.refreshHz = refreshHz
+    }
+
+    public var body: some View {
+        Group {
+            if isEnabled, let provider {
+                ForgeOverlay(provider: provider, refreshHz: refreshHz)
+                    .padding(.horizontal)
+                    .transition(
+                        .move(edge: .bottom).combined(with: .opacity)
+                    )
+            }
+        }
+        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: isEnabled)
+    }
+}
+
+/// Convenience modifier: pin a `ForgeBar` to the bottom safe-area inset of a
+/// view. Use this if you don't want to embed `ForgeBar` manually.
 public struct ForgeOverlayModifier: ViewModifier {
     private weak var provider: ForgeProvider?
     private let isEnabled: Bool
     private let refreshHz: Double
-    private let topInset: CGFloat
-    private let horizontalInset: CGFloat
 
-    public init(
-        provider: ForgeProvider?,
-        isEnabled: Bool,
-        refreshHz: Double,
-        topInset: CGFloat,
-        horizontalInset: CGFloat
-    ) {
+    public init(provider: ForgeProvider?, isEnabled: Bool, refreshHz: Double) {
         self.provider = provider
         self.isEnabled = isEnabled
         self.refreshHz = refreshHz
-        self.topInset = topInset
-        self.horizontalInset = horizontalInset
     }
 
     public func body(content: Content) -> some View {
-        content.overlay(alignment: .top) {
-            if isEnabled, let provider {
-                ForgeOverlay(provider: provider, refreshHz: refreshHz)
-                    .padding(.top, topInset)
-                    .padding(.horizontal, horizontalInset)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isEnabled)
-                    .allowsHitTesting(true)
-            }
+        content.safeAreaInset(edge: .bottom, spacing: 8) {
+            ForgeBar(provider: provider, isEnabled: isEnabled, refreshHz: refreshHz)
         }
     }
 }
 
 public extension View {
-    /// Pin a Forge overlay to the top of this view.
-    ///
-    /// - Parameters:
-    ///   - provider: An object that conforms to `ForgeProvider`.
-    ///   - isEnabled: Toggle to show/hide. Bind to a settings flag so users
-    ///     can enable Forge only in dev or only on demand. Defaults to `true`.
-    ///   - refreshHz: How often Forge polls the provider. Default `4`.
-    ///   - topInset: Padding from the top edge. Default `4`.
-    ///   - horizontalInset: Side padding. Default `12`.
+    /// Convenience: pin a Forge debugger bar above the bottom safe-area
+    /// inset of this view. For finer placement, embed `ForgeBar` directly
+    /// (e.g. as a sibling above your own chat input bar).
     func forgeOverlay(
         provider: ForgeProvider?,
         isEnabled: Bool = true,
-        refreshHz: Double = 4,
-        topInset: CGFloat = 4,
-        horizontalInset: CGFloat = 12
+        refreshHz: Double = 4
     ) -> some View {
         modifier(ForgeOverlayModifier(
             provider: provider,
             isEnabled: isEnabled,
-            refreshHz: refreshHz,
-            topInset: topInset,
-            horizontalInset: horizontalInset
+            refreshHz: refreshHz
         ))
     }
 }

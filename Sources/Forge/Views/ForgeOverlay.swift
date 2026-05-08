@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// The Forge overlay. Pin to the top of any view via the `.forgeOverlay()`
-/// modifier, or embed manually if you need bespoke placement.
+/// The Forge overlay. Designed to live directly above your chat input bar:
+/// when collapsed it's a single row matching the input bar's height &
+/// styling; when expanded it grows upward in place into a full panel
+/// with live, animated graphs.
 public struct ForgeOverlay: View {
     @StateObject private var store = ForgeStore()
     @ObservedObject private var sink = Forge.shared
@@ -18,37 +20,50 @@ public struct ForgeOverlay: View {
     }
 
     public var body: some View {
-        ZStack(alignment: .top) {
+        VStack(spacing: 0) {
             if isExpanded {
-                expandedPanel
+                expandedContent
                     .transition(.asymmetric(
-                        insertion: .scale(scale: 0.94, anchor: .top).combined(with: .opacity),
-                        removal: .scale(scale: 0.94, anchor: .top).combined(with: .opacity)
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
                     ))
             } else {
-                collapsedBar
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .top).combined(with: .opacity),
-                        removal: .opacity
-                    ))
+                collapsedRow
+                    .transition(.opacity)
             }
         }
-        .animation(.spring(response: 0.45, dampingFraction: 0.78), value: isExpanded)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(barBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(.white.opacity(0.10), lineWidth: 1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onTapGesture {
+            guard !isExpanded else { return }
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
+                isExpanded = true
+            }
+        }
+        .animation(.spring(response: 0.5, dampingFraction: 0.82), value: isExpanded)
         .onAppear {
             if let provider { store.attach(provider: provider, refreshHz: refreshHz) }
         }
         .onDisappear { store.detach() }
     }
 
-    // MARK: - Collapsed (bar)
+    // MARK: - Collapsed row (matches an empty input bar's footprint)
 
-    private var collapsedBar: some View {
+    private var collapsedRow: some View {
         HStack(spacing: 10) {
             statusDot
+
             Text(store.snapshot.modelName ?? "No model loaded")
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .font(.caption.weight(.semibold))
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(.primary)
                 .matchedGeometryEffect(id: "model", in: ns)
 
@@ -58,161 +73,200 @@ public struct ForgeOverlay: View {
                 Image(systemName: "bolt.fill")
                 Text(formattedTPS)
             }
-            .font(.caption2.monospacedDigit())
-            .foregroundStyle(store.snapshot.isGenerating ? .orange : .secondary)
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
             .matchedGeometryEffect(id: "tps", in: ns)
 
             HStack(spacing: 4) {
                 Image(systemName: "memorychip")
                 Text(formattedMemory)
             }
-            .font(.caption2.monospacedDigit())
+            .font(.caption.monospacedDigit())
             .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .forgeGlass(cornerRadius: 22)
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(.white.opacity(0.10), lineWidth: 1)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .onTapGesture {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.78)) {
-                isExpanded = true
-            }
-        }
+        .frame(maxWidth: .infinity, minHeight: 28)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel("Forge debugger. Tap to expand.")
     }
 
-    // MARK: - Expanded (panel)
+    // MARK: - Expanded content
 
-    private var expandedPanel: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                HStack {
-                    ForgeGlassButton(systemName: "xmark") {
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.78)) {
-                            isExpanded = false
-                        }
-                    }
-                    .transition(.scale.combined(with: .opacity))
-                    Spacer()
-                }
-                HStack(spacing: 8) {
-                    Image(systemName: "flame.fill")
-                        .foregroundStyle(.orange)
-                    Text("Forge")
-                        .font(.subheadline.weight(.semibold))
-                }
-                HStack {
-                    Spacer()
-                    statusDot
+    private var expandedContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            header
+
+            modelHeader
+
+            VStack(spacing: 8) {
+                ForgeChart(
+                    title: "Tokens / sec",
+                    unit: "t/s",
+                    valueLabel: formattedTPSValue,
+                    samples: store.tpsHistory,
+                    isActive: store.snapshot.isGenerating
+                )
+
+                ForgeChart(
+                    title: "Memory",
+                    unit: memoryUnit,
+                    valueLabel: memoryValueLabel,
+                    samples: store.memoryHistory,
+                    isActive: false
+                )
+
+                if let progress = contextProgress {
+                    ForgeFillBar(
+                        title: "Context",
+                        valueLabel: contextString,
+                        progress: progress
+                    )
                 }
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(store.snapshot.modelName ?? "No model loaded")
-                    .font(.callout.weight(.semibold))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .matchedGeometryEffect(id: "model", in: ns)
+            metricGrid
+
+            samplerRow
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center) {
+            ForgeGlassButton(systemName: "xmark") {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
+                    isExpanded = false
+                }
+            }
+            .transition(.scale(scale: 0.6).combined(with: .opacity))
+            Spacer()
+            Text("Forge")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .tracking(0.4)
+            Spacer()
+            statusDot
+        }
+        .frame(height: 26)
+    }
+
+    private var modelHeader: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(store.snapshot.modelName ?? "No model loaded")
+                .font(.callout.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .matchedGeometryEffect(id: "model", in: ns)
+            HStack(spacing: 6) {
                 if let arch = store.snapshot.modelArchitecture {
                     Text(arch.uppercased())
-                        .font(.caption2.weight(.medium))
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
+                        .tracking(0.5)
                 }
                 if let status = store.snapshot.statusLabel {
                     Text(status)
-                        .font(.caption2)
-                        .foregroundStyle(store.snapshot.isGenerating ? .orange : .secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
-                spacing: 8
-            ) {
-                ForgeMetricTile(title: "Tokens / sec", value: formattedTPS,
-                                systemImage: "bolt.fill",
-                                accent: .orange)
-                    .matchedGeometryEffect(id: "tps", in: ns)
-
-                ForgeMetricTile(title: "Memory", value: formattedMemory,
-                                systemImage: "memorychip",
-                                accent: .blue)
-
-                ForgeMetricTile(title: "Context",
-                                value: contextString,
-                                systemImage: "rectangle.stack",
-                                accent: .indigo)
-
-                ForgeMetricTile(title: "Tokens",
-                                value: tokenCountString,
-                                systemImage: "number",
-                                accent: .pink)
-
-                ForgeMetricTile(title: "First-token",
-                                value: firstTokenLatencyString,
-                                systemImage: "timer",
-                                accent: .yellow)
-
-                ForgeMetricTile(title: "Thermal",
-                                value: store.thermalLabel,
-                                systemImage: "thermometer.medium",
-                                accent: thermalAccent)
-
-                if let temp = store.snapshot.temperature {
-                    ForgeMetricTile(title: "Temperature",
-                                    value: String(format: "%.2f", temp),
-                                    systemImage: "dial.medium",
-                                    accent: .teal)
-                }
-                if let topP = store.snapshot.topP {
-                    ForgeMetricTile(title: "top-p",
-                                    value: String(format: "%.2f", topP),
-                                    systemImage: "slider.horizontal.3",
-                                    accent: .teal)
-                }
-                if let topK = store.snapshot.topK {
-                    ForgeMetricTile(title: "top-k",
-                                    value: "\(topK)",
-                                    systemImage: "slider.horizontal.3",
-                                    accent: .teal)
-                }
-
-                ForEach(store.snapshot.customMetrics) { metric in
-                    ForgeMetricTile(title: metric.label,
-                                    value: metric.value,
-                                    systemImage: metric.systemImage,
-                                    accent: .mint)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
-        .padding(14)
-        .forgeGlass(cornerRadius: 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var metricGrid: some View {
+        LazyVGrid(
+            columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
+            spacing: 8
+        ) {
+            ForgeMetricTile(title: "First-token",
+                            value: firstTokenLatencyString,
+                            systemImage: "timer")
+
+            ForgeMetricTile(title: "Tokens",
+                            value: tokenCountString,
+                            systemImage: "number")
+
+            ForgeMetricTile(title: "Thermal",
+                            value: store.thermalLabel,
+                            systemImage: "thermometer.medium")
+
+            ForgeMetricTile(title: "Refresh",
+                            value: String(format: "%.0f Hz", refreshHz),
+                            systemImage: "arrow.clockwise")
+
+            ForEach(store.snapshot.customMetrics) { metric in
+                ForgeMetricTile(
+                    title: metric.label,
+                    value: metric.value,
+                    systemImage: metric.systemImage
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var samplerRow: some View {
+        let temp = store.snapshot.temperature
+        let topP = store.snapshot.topP
+        let topK = store.snapshot.topK
+        if temp != nil || topP != nil || topK != nil {
+            HStack(spacing: 8) {
+                if let t = temp {
+                    samplerTag("temp", String(format: "%.2f", t))
+                }
+                if let p = topP {
+                    samplerTag("top-p", String(format: "%.2f", p))
+                }
+                if let k = topK {
+                    samplerTag("top-k", "\(k)")
+                }
+                Spacer()
+            }
+        }
+    }
+
+    private func samplerTag(_ label: String, _ value: String) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption2.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            Capsule().fill(.white.opacity(0.05))
+        )
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(.white.opacity(0.10), lineWidth: 1)
+            Capsule().strokeBorder(.white.opacity(0.08), lineWidth: 1)
         )
     }
 
-    // MARK: - Status dot
+    // MARK: - Status dot (pulses while generating)
 
     private var statusDot: some View {
-        Circle()
-            .fill(store.snapshot.isGenerating ? Color.orange : Color.green)
-            .frame(width: 8, height: 8)
-            .overlay(
-                Circle()
-                    .stroke(.white.opacity(0.35), lineWidth: 0.5)
-            )
-            .shadow(color: store.snapshot.isGenerating ? .orange.opacity(0.6) : .clear,
-                    radius: 4)
-            .modifier(PulseIfActive(active: store.snapshot.isGenerating))
+        let active = store.snapshot.isGenerating
+        return Circle()
+            .fill(.primary)
+            .frame(width: 7, height: 7)
+            .opacity(active ? 1.0 : 0.45)
+            .modifier(PulseIfActive(active: active))
+    }
+
+    // MARK: - Background (matches Haplo input bar styling)
+
+    @ViewBuilder
+    private var barBackground: some View {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .glassEffect(.clear.interactive(), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        } else {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.ultraThinMaterial)
+        }
     }
 
     // MARK: - Formatters
@@ -222,10 +276,25 @@ public struct ForgeOverlay: View {
         return String(format: "%.1f t/s", tps)
     }
 
+    private var formattedTPSValue: String {
+        guard let tps = store.snapshot.tokensPerSecond, tps > 0 else { return "—" }
+        return String(format: "%.1f", tps)
+    }
+
     private var formattedMemory: String {
         let mb = store.memoryMB
         if mb >= 1024 { return String(format: "%.2f GB", mb / 1024) }
         return String(format: "%.0f MB", mb)
+    }
+
+    private var memoryValueLabel: String {
+        let mb = store.memoryMB
+        if mb >= 1024 { return String(format: "%.2f", mb / 1024) }
+        return String(format: "%.0f", mb)
+    }
+
+    private var memoryUnit: String {
+        store.memoryMB >= 1024 ? "GB" : "MB"
     }
 
     private var contextString: String {
@@ -237,6 +306,14 @@ public struct ForgeOverlay: View {
         case let (nil, w?): return "— / \(w)"
         default: return "—"
         }
+    }
+
+    private var contextProgress: Double? {
+        guard let used = store.snapshot.contextUsed,
+              let window = store.snapshot.contextWindow,
+              window > 0
+        else { return nil }
+        return min(1.0, Double(used) / Double(window))
     }
 
     private var tokenCountString: String {
@@ -255,16 +332,6 @@ public struct ForgeOverlay: View {
         if ms >= 1000 { return String(format: "%.2fs", ms / 1000) }
         return String(format: "%.0fms", ms)
     }
-
-    private var thermalAccent: Color {
-        switch store.thermalLabel {
-        case "Nominal": return .green
-        case "Fair": return .yellow
-        case "Serious": return .orange
-        case "Critical": return .red
-        default: return .gray
-        }
-    }
 }
 
 private struct PulseIfActive: ViewModifier {
@@ -273,8 +340,8 @@ private struct PulseIfActive: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .scaleEffect(active && pulse ? 1.25 : 1.0)
-            .opacity(active && pulse ? 0.6 : 1.0)
+            .scaleEffect(active && pulse ? 1.4 : 1.0)
+            .opacity(active && pulse ? 0.5 : 1.0)
             .animation(
                 active
                     ? .easeInOut(duration: 0.7).repeatForever(autoreverses: true)

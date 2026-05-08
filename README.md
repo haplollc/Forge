@@ -83,7 +83,9 @@ extension MyChatService: ForgeProvider {
 }
 ```
 
-### 2. Pin the overlay to your chat view
+### 2. Place the bar above your chat input
+
+The cleanest pattern is to embed `ForgeBar` as a sibling above your input bar — the collapsed state is sized to match an empty single-row input, and the expanded panel grows in place above it.
 
 ```swift
 import Forge
@@ -93,15 +95,25 @@ struct ChatView: View {
     @AppStorage("forgeOverlayEnabled") private var forgeOverlayEnabled = false
 
     var body: some View {
-        VStack {
-            // …your chat UI…
-        }
-        .forgeOverlay(provider: chatService, isEnabled: forgeOverlayEnabled)
+        VStack { /* …your messages list… */ }
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 8) {
+                    ForgeBar(provider: chatService, isEnabled: forgeOverlayEnabled)
+                    ChatInputBar(...)
+                }
+            }
     }
 }
 ```
 
-That's it. Long-press the bar to expand, tap the glass xmark to collapse.
+Don't have a custom safe-area inset? Use the convenience modifier — it pins a `ForgeBar` to the bottom for you:
+
+```swift
+ChatView()
+    .forgeOverlay(provider: chatService, isEnabled: forgeOverlayEnabled)
+```
+
+Tap the bar to expand. Tap the glass `xmark` (top-left) to collapse.
 
 ### 3. (Optional) Let Forge compute tokens/sec for you
 
@@ -129,17 +141,14 @@ Forge.shared.endGeneration()
 Status dot (pulses when generating) · model name (truncated middle) · live TPS · resident memory.
 
 ### Expanded (panel)
-- Glass-effect circular `xmark` button (animates in from scale + opacity)
+- Glass `xmark` circle button (top-left, animates in from scale + opacity)
 - Model name + architecture + status label
-- Metric tiles (2-column grid):
-  - Tokens / sec
-  - Memory (MB / GB auto-formatted)
-  - Context used / window
-  - Prompt → completion token counts
-  - First-token latency (ms / s auto-formatted)
-  - Thermal state (color-coded green → red)
-  - Sampler params (temperature, top-p, top-k) — only shown when provided
-  - Any `customMetrics` from your snapshot
+- **Live animated graphs** (Swift Charts, Catmull-Rom interpolation, monochrome white-on-glass):
+  - Tokens / sec sparkline with pulsing tip indicator
+  - Memory sparkline
+  - Context fill bar (only shown when both `contextUsed` and `contextWindow` are provided)
+- Metric tiles (2-column grid): first-token latency, token counts, thermal state, refresh rate, plus any `customMetrics` you supply
+- Sampler param chips (temperature / top-p / top-k) — only shown when provided
 
 ## API surface
 
@@ -194,18 +203,25 @@ ForgeMetric(label: "Backend", value: "Metal", systemImage: "cpu")
 }
 ```
 
-### `.forgeOverlay(...)`
+### `ForgeBar` (recommended)
+```swift
+public struct ForgeBar: View {
+    public init(provider: ForgeProvider?, isEnabled: Bool = true, refreshHz: Double = 4)
+}
+```
+Embed directly as a sibling above your chat input bar.
+
+### `.forgeOverlay(...)` (convenience)
 ```swift
 extension View {
     func forgeOverlay(
         provider: ForgeProvider?,
         isEnabled: Bool = true,
-        refreshHz: Double = 4,
-        topInset: CGFloat = 4,
-        horizontalInset: CGFloat = 12
+        refreshHz: Double = 4
     ) -> some View
 }
 ```
+Pins a `ForgeBar` to the bottom safe-area inset. Use it when you don't already have a custom bottom inset and just want a one-liner.
 
 `refreshHz` controls how often Forge polls your `forgeSnapshot`. The default of 4 Hz is plenty for a debugger and trivially cheap.
 
@@ -216,12 +232,13 @@ Sources/Forge/
 ├── Forge.swift                  // Shared event sink (begin / tick / end)
 ├── ForgeProvider.swift          // The plug-and-play protocol
 ├── ForgeSnapshot.swift          // Snapshot + ForgeMetric types
-├── ForgeStore.swift             // Internal observable that drives the UI
+├── ForgeStore.swift             // Observable + rolling history buffers for charts
 ├── ForgeMetricsProbe.swift      // Memory & thermal probes
 └── Views/
-    ├── ForgeOverlay.swift       // Collapsed bar + expanded panel + animations
-    ├── ForgeOverlayModifier.swift  // .forgeOverlay() view modifier
-    ├── ForgeMetricTile.swift    // One tile in the expanded grid
+    ├── ForgeOverlay.swift       // Collapsed bar + expanded panel
+    ├── ForgeOverlayModifier.swift  // ForgeBar view + .forgeOverlay() modifier
+    ├── ForgeChart.swift         // Animated sparklines + context-fill bar
+    ├── ForgeMetricTile.swift    // One tile in the expanded grid (monochrome)
     ├── ForgeGlassButton.swift   // The xmark glass button
     └── ForgeBackport.swift      // Glass-style background helper
 ```
