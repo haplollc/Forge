@@ -3,7 +3,8 @@ import SwiftUI
 /// The Forge overlay. Designed to live directly above your chat input bar:
 /// when collapsed it's a single row matching the input bar's height &
 /// styling; when expanded it grows upward in place into a full panel
-/// with live, animated graphs.
+/// with a sticky toolbar at the top and an edge-to-edge scroll area
+/// containing live, animated graphs.
 public struct ForgeOverlay: View {
     @StateObject private var store = ForgeStore()
     @ObservedObject private var sink = Forge.shared
@@ -29,11 +30,12 @@ public struct ForgeOverlay: View {
                     ))
             } else {
                 collapsedRow
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                     .transition(.opacity)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(barBackground)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
@@ -93,70 +95,79 @@ public struct ForgeOverlay: View {
     // MARK: - Expanded content
 
     private var expandedContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header
-
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 12) {
-                    modelHeader
-
-                    ForgeChart(
-                        title: "Tokens / sec",
-                        unit: "t/s",
-                        valueLabel: formattedTPSValue,
-                        samples: store.tpsHistory,
-                        capacity: ForgeStore.historyCapacity,
-                        style: .tokensPerSecond(observedPeak: store.observedPeakTPS),
-                        isActive: store.snapshot.isGenerating
-                    )
-
-                    ForgeChart(
-                        title: "Memory",
-                        unit: memoryUnit,
-                        valueLabel: memoryValueLabel,
-                        samples: store.memoryHistory,
-                        capacity: ForgeStore.historyCapacity,
-                        style: .memory(budgetMB: store.memoryBudgetMB),
-                        isActive: false
-                    )
-
-                    if let progress = contextProgress {
-                        ForgeFillBar(
-                            title: "Context",
-                            valueLabel: contextString,
-                            progress: progress,
-                            style: .contextUsage
-                        )
-                    }
-
-                    metricGrid
-
-                    samplerRow
-                }
-                .padding(.bottom, 4)
-            }
-            .frame(maxHeight: 360)
-            .scrollBounceBehavior(.basedOnSize)
+        VStack(spacing: 0) {
+            toolbar
+            Divider()
+                .background(.white.opacity(0.10))
+            scrollContent
         }
+        .frame(maxHeight: 420)
     }
 
-    private var header: some View {
-        HStack(alignment: .center) {
-            ForgeGlassButton(systemName: "xmark") {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
-                    isExpanded = false
+    private var toolbar: some View {
+        ZStack {
+            HStack {
+                ForgeGlassButton(systemName: "xmark") {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
+                        isExpanded = false
+                    }
                 }
+                .transition(.scale(scale: 0.6).combined(with: .opacity))
+                Spacer()
+                statusDot
             }
-            .transition(.scale(scale: 0.6).combined(with: .opacity))
-            Spacer()
+
             Text("Forge")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .tracking(0.4)
-            Spacer()
-            statusDot
         }
-        .frame(height: 26)
+        .frame(height: 44)
+        .padding(.horizontal, 14)
+    }
+
+    private var scrollContent: some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 12) {
+                modelHeader
+
+                ForgeChart(
+                    title: "Tokens / sec",
+                    unit: "t/s",
+                    valueLabel: formattedTPSValue,
+                    samples: store.tpsHistory,
+                    capacity: ForgeStore.historyCapacity,
+                    style: .tokensPerSecond(observedPeak: store.observedPeakTPS),
+                    isActive: store.snapshot.isGenerating
+                )
+
+                ForgeChart(
+                    title: "Memory",
+                    unit: memoryUnit,
+                    valueLabel: memoryValueLabel,
+                    samples: store.memoryHistory,
+                    capacity: ForgeStore.historyCapacity,
+                    style: .memory(budgetMB: store.memoryBudgetMB),
+                    isActive: false
+                )
+
+                if let progress = contextProgress {
+                    ForgeFillBar(
+                        title: "Context",
+                        valueLabel: contextString,
+                        progress: progress,
+                        style: .contextUsage
+                    )
+                }
+
+                metricGrid
+
+                samplerRow
+            }
+            .padding(.horizontal, 14)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .contentMargins(.vertical, 14, for: .scrollContent)
     }
 
     private var modelHeader: some View {
