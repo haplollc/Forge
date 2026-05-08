@@ -5,8 +5,10 @@ import PackageDescription
 let package = Package(
     name: "Forge",
     platforms: [
-        .iOS(.v16),
-        .macOS(.v13)
+        .iOS(.v17),
+        .macOS(.v14),
+        .macCatalyst(.v17),
+        .visionOS(.v1)
     ],
     products: [
         .library(
