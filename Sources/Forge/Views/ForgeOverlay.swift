@@ -94,40 +94,10 @@ public struct ForgeOverlay: View {
 
     // MARK: - Expanded content
 
+    private static let topToolbarHeight: CGFloat = 56
+
     private var expandedContent: some View {
-        VStack(spacing: 0) {
-            toolbar
-            Divider()
-                .background(.white.opacity(0.10))
-            scrollContent
-        }
-        .frame(maxHeight: 420)
-    }
-
-    private var toolbar: some View {
-        ZStack {
-            HStack {
-                ForgeGlassButton(systemName: "xmark") {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
-                        isExpanded = false
-                    }
-                }
-                .transition(.scale(scale: 0.6).combined(with: .opacity))
-                Spacer()
-                statusDot
-            }
-
-            Text("Forge")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .tracking(0.4)
-        }
-        .frame(height: 44)
-        .padding(.horizontal, 14)
-    }
-
-    private var scrollContent: some View {
-        ScrollView(.vertical, showsIndicators: true) {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 12) {
                 modelHeader
 
@@ -167,7 +137,55 @@ public struct ForgeOverlay: View {
             .padding(.horizontal, 14)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .contentMargins(.vertical, 14, for: .scrollContent)
+        .contentMargins(.top, Self.topToolbarHeight + 8, for: .scrollContent)
+        .contentMargins(.bottom, 14, for: .scrollContent)
+        .frame(maxHeight: 420)
+        .overlay(alignment: .top) { progressiveTopBlur }
+        .overlay(alignment: .top) { floatingToolbar }
+    }
+
+    /// A material whose opacity fades from full at the top to clear at the
+    /// bottom — content scrolling under it appears to "blur into" the
+    /// toolbar zone rather than hitting a hard divider line.
+    private var progressiveTopBlur: some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .frame(height: Self.topToolbarHeight + 16)
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .black,                  location: 0.0),
+                        .init(color: .black.opacity(0.95),    location: 0.5),
+                        .init(color: .black.opacity(0.55),    location: 0.8),
+                        .init(color: .clear,                  location: 1.0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .allowsHitTesting(false)
+    }
+
+    private var floatingToolbar: some View {
+        ZStack {
+            HStack {
+                ForgeGlassButton(systemName: "xmark") {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
+                        isExpanded = false
+                    }
+                }
+                .transition(.scale(scale: 0.6).combined(with: .opacity))
+                Spacer()
+                statusDot
+            }
+
+            Text("Forge")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .tracking(0.4)
+        }
+        .padding(.horizontal, 14)
+        .frame(height: Self.topToolbarHeight)
     }
 
     private var modelHeader: some View {
