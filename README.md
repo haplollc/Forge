@@ -17,6 +17,23 @@
   Plug-and-play • Engine-agnostic • Glass-styled • Animated charts • Device-aware
 </p>
 
+<!--
+  GitHub only renders <video> tags whose src is on a github-owned CDN that
+  user-attachments produces (issue/PR drag-drop), and that URL can't be
+  generated via API. Bare release-asset .mp4 URLs render as plain links.
+  The animated GIF in the repo, on the other hand, renders inline via the
+  standard markdown image syntax — so we ship a GIF for the README preview
+  and keep the full-quality MP4 on the `demo-assets` release for download.
+-->
+
+<p align="center">
+  <a href="https://github.com/haplollc/Forge/releases/download/demo-assets/forge_demo.mp4">
+    <img src="Media/forge_demo.gif" alt="Forge demo: tap the bar above the chat input to expand into a panel with a floating toolbar, progressive-blur scroll edge, and live threshold-colored sparklines for tokens-per-second and memory." width="280">
+  </a>
+  <br>
+  <sub><em>Tap to expand → live, threshold-colored sparklines for tokens/sec and memory, device-aware Y axes, progressive-blur scroll edge under a floating toolbar. <a href="https://github.com/haplollc/Forge/releases/download/demo-assets/forge_demo.mp4">Watch full-quality MP4 →</a></em></sub>
+</p>
+
 ---
 
 ## Why Forge
