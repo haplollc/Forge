@@ -3,7 +3,6 @@
   <img src="https://img.shields.io/badge/Swift-5.9%2B-orange" alt="Swift">
   <img src="https://img.shields.io/badge/SwiftUI-Native-purple" alt="SwiftUI">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
-  <a href="https://buymeacoffee.com/jcbuilds"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee"></a>
 </p>
 
 <h1 align="center">🔥 Forge</h1>
@@ -33,6 +32,12 @@
   </a>
   <br>
   <sub><em>Tap to expand → live, threshold-colored sparklines for tokens/sec and memory, device-aware Y axes, progressive-blur scroll edge under a floating toolbar. <a href="https://github.com/haplollc/Forge/releases/download/demo-assets/forge_demo.mp4">Watch full-quality MP4 →</a></em></sub>
+</p>
+
+<p align="center">
+  <a href="https://buymeacoffee.com/jcbuilds"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" width="200"></a>
+  <br>
+  <sub>If Forge is useful to you, a coffee keeps it going.</sub>
 </p>
 
 ---
