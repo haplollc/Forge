@@ -272,7 +272,7 @@ Forge ships sensible defaults, all tuned at runtime — **no hard-coded device c
 - Domain `0…1` (fraction of window).
 - Direction `lowerIsBetter`. Default thresholds: **green** ≤ 55%, **yellow** 55-75%, **orange** 75-90%, **red** > 90%.
 
-If you want to override, instantiate a `ForgeChartStyle` directly and pass it to `ForgeChart` from your own embedding.
+The HUD always uses these defaults. `ForgeChartStyle` is public, so you can build your own with `init(domain:direction:nominal:warning:danger:)` and use its `color(for:)` and gradients in your own views.
 
 ## API surface
 
@@ -375,10 +375,6 @@ public struct ForgeChartStyle: Sendable {
     public func color(for value: Double) -> Color
     public var verticalGradient: LinearGradient
     public var verticalAreaGradient: LinearGradient
-
-    public static func memory(budgetMB: Double) -> ForgeChartStyle
-    public static func tokensPerSecond(observedPeak: Double) -> ForgeChartStyle
-    public static var contextUsage: ForgeChartStyle
 }
 ```
 
