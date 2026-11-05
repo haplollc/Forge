@@ -70,7 +70,7 @@ The collapsed bar matches the footprint of an empty input bar. Tap to expand int
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/haplollc/Forge.git", from: "0.1.0")
+    .package(url: "https://github.com/haplollc/Forge.git", branch: "main")
 ]
 ```
 
